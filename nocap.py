@@ -1,9 +1,13 @@
 import requests 
 import time 
 
+class ApiError(Exception):
+    """Raised when an error is returned from the NoCap API"""
+    pass
+
 class NoCap:
     
-    def __init__(self, api_key, poll=1):
+    def __init__(self, api_key, poll=2):
         self.session = requests.Session()
         # Server settings
         self.server = "https://no-cap.io"
@@ -30,8 +34,10 @@ class NoCap:
             task_id (str): Task ID used for polling the task status
         """
         url = f"{self.api}/create?api_key={self.api_key}"
-        resp = self.session.post(url, json=kwargs)
-        task_id = resp.json()['task']
+        resp = self.session.post(url, json=kwargs).json()
+        if 'error' in resp:
+            raise ApiError(resp['error'])
+        task_id = resp['task']
         return task_id
     
     def get_status(self, task_id):
@@ -42,7 +48,7 @@ class NoCap:
             task_id (str): Task ID to poll status of
 
         Returns:
-            Captcha token or None if an error occurred
+            Captcha token
         """
         url = f"{self.api}/status?api_key={self.api_key}&task_id={task_id}"
         r = None
@@ -51,7 +57,7 @@ class NoCap:
             r = self.session.get(url).json()
         if r['status'] == "success":
             return r['answer']
-        return None 
+        raise ApiError("failed")
         
     def hcaptcha(self, **kwargs):
         task_id = self.create_task(**kwargs)
